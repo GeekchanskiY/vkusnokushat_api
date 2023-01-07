@@ -1,3 +1,5 @@
+import time
+
 from rest_framework import viewsets
 from .serializers import UserSerializer
 from .models import TastyUser
@@ -6,6 +8,10 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.parsers import FileUploadParser
 from django.db.models import Q
+
+from restaurants.models import Restaurant
+from restaurants.serializers import RestaurantSerializer
+from django.core.exceptions import ObjectDoesNotExist
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -27,11 +33,12 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(methods=['post'], detail=False, name='register', serializer_class=UserSerializer)
     def register(self, request):
         data = request.data
+        try:
+            TastyUser.objects.get(username=data["username"])
 
-        test = TastyUser.objects.filter(username=data["username"])
-        if test:
-            return Response({"error": "user with this username already exists"}, status=status.HTTP_400_BAD_REQUEST)
-
+            return Response({"error": "Такой пользователь уже существует"}, status=status.HTTP_400_BAD_REQUEST)
+        except:
+            pass
         user = TastyUser(
             username=data['username'],
         )
@@ -66,7 +73,7 @@ class UserViewSet(viewsets.ModelViewSet):
         try:
             user.set_password(data["password"])
         except AttributeError:
-            return Response({"detail": "no new password provided"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "Нет нового пароля!"}, status=status.HTTP_400_BAD_REQUEST)
         user.save()
         serializer = UserSerializer(user)
         return Response(serializer.data, status=status.HTTP_200_OK)
@@ -78,6 +85,60 @@ class UserViewSet(viewsets.ModelViewSet):
         try:
             user.avatar = request.FILES['file']
             user.save()
-            return Response({"detail": "avatar updated successfully"}, status=status.HTTP_200_OK)
+            return Response({"detail": "Аватар успешно обновлён"}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": e.__str__()})
+
+
+    @action(methods=['post'], detail=False, name='like')
+    def like(self, request):
+        user = request.user
+
+        data = request.data
+
+        try:
+            restaurant = Restaurant.objects.get(name=data.get("name", None))
+        except ObjectDoesNotExist:
+            return Response({"error": "Такого ресторана не существует"}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            user.likes.add(restaurant)
+            user.save()
+            return Response({"message": "Лайк!"}, status=status.HTTP_200_OK)
+        except:
+            return Response({"error": "ошибка"}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['post'], detail=False, name='dislike')
+    def dislike(self, request):
+        user = request.user
+
+        data = request.data
+
+        try:
+            restaurant = Restaurant.objects.get(name=data.get("name", None))
+        except ObjectDoesNotExist:
+            return Response({"error": "Такого ресторана не существует"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user.likes.remove(restaurant)
+            user.save()
+            return Response({"message": "Дизлайк!"}, status=status.HTTP_200_OK)
+        except:
+            return Response({"error": "ошибка"}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(methods=['post'], detail=False, name='dislike')
+    def check_like(self, request):
+        user = request.user
+
+        data = request.data
+
+        try:
+            restaurant = Restaurant.objects.get(name=data.get("name", None))
+        except:
+            return Response({"error": "Такого ресторана не существует"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if restaurant in user.likes.all():
+            return Response({"message": True}, status=status.HTTP_200_OK)
+        else:
+            return Response({"message": False}, status=status.HTTP_200_OK)
+
+

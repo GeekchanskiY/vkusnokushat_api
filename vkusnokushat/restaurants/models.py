@@ -28,6 +28,7 @@ class Restaurant(models.Model):
     name = models.CharField(max_length=255)
     work_time = models.CharField(max_length=255)
     place = models.CharField(max_length=255)
+    contacts = models.CharField(max_length=255, default="")
     rating = models.IntegerField(validators=[
             MaxValueValidator(10),
             MinValueValidator(1)
@@ -45,6 +46,17 @@ class Restaurant(models.Model):
     class Meta:
         verbose_name = "Restaurant"
         verbose_name_plural = "Restaurants"
+
+
+class Review(models.Model):
+    user = models.ForeignKey('users.TastyUser', on_delete=models.CASCADE)
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE)
+    rating = models.IntegerField(validators=[
+        MaxValueValidator(10),
+        MinValueValidator(1)
+    ], default=1)
+    title = models.CharField(max_length=255)
+    text = models.TextField()
 
 
 class RestaurantImage(models.Model):

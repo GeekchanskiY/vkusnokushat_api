@@ -6,7 +6,7 @@ from django.db.models import Q
 from rest_framework import pagination
 from django.core.exceptions import ObjectDoesNotExist
 
-from .models import Restaurant, RestaurantImage, RestaurantCountry, RestaurantCategory
+from .models import Restaurant, RestaurantImage, RestaurantCountry, RestaurantCategory, Review
 
 from .serializers import RestaurantImageSerializer, RestaurantCategorySerializer, RestaurantCountrySerializer,\
     RestaurantSerializer
@@ -17,6 +17,30 @@ class RestaurantViewSet(viewsets.ModelViewSet):
     serializer_class = RestaurantSerializer
     lookup_field = 'name'
     permission_classes = [permissions.AllowAny]
+
+    def get_permissions(self):
+        if self.action == "comment":
+            permission_classes = [permissions.IsAuthenticated]
+        else:
+            permission_classes = [permissions.AllowAny]
+        return [permission() for permission in permission_classes]
+
+    @action(methods=["POST"], name='comment', detail=False)
+    def comment(self, request):
+        data = request.data
+        user = request.user
+
+        restaurant = self.queryset.get(id=data["restaurant"])
+        comment = Review(
+            user=user,
+            restaurant=restaurant,
+            rating=data["rating"],
+            title=data["title"],
+            text=data["text"]
+        )
+        comment.save()
+        return Response({"success": "comment saved!"}, status=status.HTTP_200_OK)
+
 
     @action(methods=["POST"], name='search', detail=False)
     def search(self, request):
@@ -30,14 +54,16 @@ class RestaurantViewSet(viewsets.ModelViewSet):
         queryset = self.queryset
 
         if country is not None:
-            country = RestaurantCountry.objects.filter(name=country)
-            if len(country) == 0:
+            try:
+                country = RestaurantCountry.objects.get(name=country)
+            except:
                 return Response({"error": "no country"}, status=status.HTTP_400_BAD_REQUEST)
             queryset = queryset.filter(country=country)
 
         if category is not None:
-            category = RestaurantCategory.objects.filter(name=category)
-            if len(category) == 0:
+            try:
+                category = RestaurantCategory.objects.get(name=category)
+            except:
                 return Response({"error": "no category"}, status=status.HTTP_400_BAD_REQUEST)
             queryset = queryset.filter(category=category)
 
